@@ -320,7 +320,29 @@ const DraggableStickerItem = ({ sticker, onDelete, screenWidth, screenHeight }) 
   );
 };
 
-// ... (rest of the presets and constants)
+// Filter presets with overlay colors
+const FILTER_PRESETS = [
+  { id: 'normal', name: 'Normal', overlay: null },
+  { id: 'warm', name: 'Warm', overlay: 'rgba(255, 165, 0, 0.15)' },
+  { id: 'cool', name: 'Cool', overlay: 'rgba(0, 100, 255, 0.15)' },
+  { id: 'vintage', name: 'Vintage', overlay: 'rgba(160, 120, 60, 0.22)' },
+  { id: 'fade', name: 'Fade', overlay: 'rgba(255, 255, 255, 0.25)' },
+  { id: 'dramatic', name: 'Drama', overlay: 'rgba(0, 0, 0, 0.2)' },
+  { id: 'rose', name: 'Rose', overlay: 'rgba(255, 100, 130, 0.15)' },
+  { id: 'emerald', name: 'Emerald', overlay: 'rgba(16, 185, 129, 0.12)' },
+  { id: 'sunset', name: 'Sunset', overlay: 'rgba(255, 100, 50, 0.18)' },
+  { id: 'moonlight', name: 'Moonlight', overlay: 'rgba(100, 100, 200, 0.18)' },
+];
+
+const STICKER_TYPES = [
+  { type: 'location', label: 'Lokasi', icon: 'location-outline' },
+  { type: 'mention', label: 'Mention', icon: 'at-outline' },
+  { type: 'hashtag', label: 'Hashtag', icon: 'pricetag-outline' },
+  { type: 'poll', label: 'Polling', icon: 'bar-chart-outline' },
+  { type: 'question', label: 'Pertanyaan', icon: 'help-circle-outline' },
+  { type: 'time', label: 'Waktu', icon: 'time-outline' },
+  { type: 'image', label: 'Gambar', icon: 'image-outline' },
+];
 
 const StoryEditorScreenSimple = ({ route }) => {
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -541,6 +563,232 @@ const StoryEditorScreenSimple = ({ route }) => {
         </View>
       </View>
     </Modal>
+  );
+
+  // Font options
+  const fonts = [
+    { id: 'default', label: 'Default', fontFamily: undefined },
+    { id: 'serif', label: 'Serif', fontFamily: 'serif' },
+    { id: 'mono', label: 'Mono', fontFamily: 'monospace' },
+    { id: 'bold', label: 'Bold', fontWeight: 'bold' },
+  ];
+
+  // Color palette for text
+  const colors = [
+    '#FFFFFF', '#000000', '#FF3B5C', '#3B82F6',
+    '#FBBF24', '#8B5CF6', '#EC4899', '#10B981',
+    '#FF9500', '#00D4FF',
+  ];
+
+  // Background colors for text
+  const bgColors = [
+    'transparent', 'rgba(0,0,0,0.5)', 'rgba(255,255,255,0.5)',
+    'rgba(255,59,92,0.7)', 'rgba(59,130,246,0.7)',
+    'rgba(251,191,36,0.7)', 'rgba(16,185,129,0.7)',
+  ];
+
+  // Get font style
+  const getFontStyle = (fontId) => {
+    const font = fonts.find(f => f.id === fontId);
+    if (!font) return {};
+    return {
+      fontFamily: font.fontFamily,
+      fontWeight: font.fontWeight || 'normal',
+    };
+  };
+
+  // Open modal to add new text
+  const handleOpenAddText = () => {
+    setEditingElementId(null);
+    setTextInput('');
+    setSelectedColor('#FFFFFF');
+    setSelectedBgColor('transparent');
+    setSelectedFont('default');
+    setTextSize(28);
+    setTextAlign('center');
+    setShowTextModal(true);
+  };
+
+  // Add or update text
+  const handleAddText = () => {
+    if (!textInput.trim()) {
+      setShowTextModal(false);
+      return;
+    }
+
+    if (editingElementId) {
+      setTextElements(prev => prev.map(el =>
+        el.id === editingElementId
+          ? {
+              ...el,
+              text: textInput.trim(),
+              color: selectedColor,
+              bgColor: selectedBgColor,
+              font: selectedFont,
+              size: textSize,
+              align: textAlign,
+            }
+          : el
+      ));
+    } else {
+      const offset = textElements.length * 40;
+      const newTextElement = {
+        id: Date.now().toString(),
+        text: textInput.trim(),
+        color: selectedColor,
+        bgColor: selectedBgColor,
+        font: selectedFont,
+        size: textSize,
+        align: textAlign,
+        scale: 1,
+        x: SCREEN_WIDTH / 2 - 100,
+        y: SCREEN_HEIGHT / 3 + offset,
+      };
+      setTextElements(prev => [...prev, newTextElement]);
+    }
+
+    setTextInput('');
+    setEditingElementId(null);
+    setShowTextModal(false);
+  };
+
+  // Edit existing text
+  const handleEditText = (element) => {
+    setEditingElementId(element.id);
+    setTextInput(element.text);
+    setSelectedColor(element.color);
+    setSelectedBgColor(element.bgColor || 'transparent');
+    setSelectedFont(element.font || 'default');
+    setTextSize(element.size || 28);
+    setTextAlign(element.align || 'center');
+    setShowTextModal(true);
+  };
+
+  // Delete text
+  const handleDeleteText = (elementId) => {
+    setTextElements(prev => prev.filter(el => el.id !== elementId));
+  };
+
+  // Delete sticker
+  const handleDeleteSticker = (stickerId) => {
+    setStickerElements(prev => prev.filter(s => s.id !== stickerId));
+  };
+
+  // Pick image from gallery to use as sticker
+  const handlePickImageSticker = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        addStickerElement('image', { imageUri, text: 'image' });
+      }
+    } catch (error) {
+      console.error('Error picking image sticker:', error);
+      Alert.alert('Error', 'Gagal memilih gambar');
+    }
+  };
+
+  // Handle sticker type selection
+  const handleStickerTypeSelect = (type) => {
+    setShowStickerPanel(false);
+    switch (type) {
+      case 'location':
+        setLocationInput('');
+        setShowLocationInput(true);
+        break;
+      case 'mention':
+        setMentionInput('');
+        setShowMentionInput(true);
+        break;
+      case 'hashtag':
+        setHashtagInput('');
+        setShowHashtagInput(true);
+        break;
+      case 'poll':
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setShowPollInput(true);
+        break;
+      case 'question':
+        setQuestionInput('');
+        setShowQuestionInput(true);
+        break;
+      case 'time':
+        addStickerElement('time', {
+          text: new Date().toLocaleString('id-ID', {
+            weekday: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            day: 'numeric',
+            month: 'short',
+          }),
+        });
+        break;
+      case 'image':
+        handlePickImageSticker();
+        break;
+    }
+  };
+
+  // Add sticker element to canvas
+  const addStickerElement = (type, data) => {
+    const offset = stickerElements.length * 40;
+    const newSticker = {
+      id: Date.now().toString(),
+      type,
+      data,
+      scale: 1,
+      x: SCREEN_WIDTH / 2 - 60,
+      y: SCREEN_HEIGHT / 3 + offset,
+    };
+    setStickerElements(prev => [...prev, newSticker]);
+  };
+
+  // Confirm sticker input handlers
+  const handleConfirmLocation = () => {
+    if (!locationInput.trim()) return;
+    addStickerElement('location', { text: locationInput.trim() });
+    setShowLocationInput(false);
+  };
+
+  const handleConfirmMention = () => {
+    if (!mentionInput.trim()) return;
+    addStickerElement('mention', { text: mentionInput.trim() });
+    setShowMentionInput(false);
+  };
+
+  const handleConfirmHashtag = () => {
+    if (!hashtagInput.trim()) return;
+    addStickerElement('hashtag', { text: hashtagInput.trim() });
+    setShowHashtagInput(false);
+  };
+
+  const handleConfirmPoll = () => {
+    if (!pollQuestion.trim()) return;
+    const validOptions = pollOptions.filter(o => o.trim());
+    if (validOptions.length < 2) {
+      Alert.alert('Error', 'Minimal 2 opsi harus diisi');
+      return;
+    }
+    addStickerElement('poll', { text: pollQuestion.trim(), options: validOptions });
+    setShowPollInput(false);
+  };
+
+  const handleConfirmQuestion = () => {
+    if (!questionInput.trim()) return;
+    addStickerElement('question', { text: questionInput.trim() });
+    setShowQuestionInput(false);
+  };
+
+  // Filtered sticker types for search
+  const filteredStickerTypes = STICKER_TYPES.filter(s =>
+    s.label.toLowerCase().includes(stickerSearchQuery.toLowerCase()) ||
+    s.type.toLowerCase().includes(stickerSearchQuery.toLowerCase())
   );
 
   return (
