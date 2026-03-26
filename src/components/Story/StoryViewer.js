@@ -1807,20 +1807,22 @@ const StoryViewer = ({
     flex: 1,
     backgroundColor: '#000000',
   },
+  contentContainer: {
+    flex: 1,
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
+  },
   mediaWrapper: {
     ...StyleSheet.absoluteFillObject,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
   },
   loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 5,
+    zIndex: 2000,
+    elevation: 2000,
   },
   media: {
     width: SCREEN_WIDTH,
