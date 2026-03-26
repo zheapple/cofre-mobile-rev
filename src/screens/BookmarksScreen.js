@@ -20,10 +20,10 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import StoryBar from '../components/Story/StoryBar';
-import StoryViewer from '../components/Story/StoryViewer';
 import VideoPreviewModal from '../components/VideoPreviewModal';
 import useStories from '../hooks/useStories';
 import { formatPrice } from '../utils/formatUtils';
+import { registerNavigationCallback } from '../utils/navigationCallbacks';
 
 const BookmarksScreen = ({ navigation }) => {
   const { width: SCREEN_WIDTH } = useWindowDimensions();
@@ -42,57 +42,24 @@ const BookmarksScreen = ({ navigation }) => {
 
   // Real Stories integration
   const { stories, loading: storiesLoading, fetchStories, markStoriesAsViewed } = useStories();
-  const [showStoryViewer, setShowStoryViewer] = useState(false);
-  const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
+  const [pendingStoryRefresh, setPendingStoryRefresh] = useState(false);
+
+  useEffect(() => {
+    if (!pendingStoryRefresh) return;
+    setPendingStoryRefresh(false);
+    fetchStories?.();
+  }, [pendingStoryRefresh, fetchStories]);
 
   // Video Preview Modal state
   const [showVideoPreview, setShowVideoPreview] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState(null);
 
-  // Debug: Track story viewer state changes
-  useEffect(() => {
-    console.log('📺 [BookmarksScreen] StoryViewer state changed:', {
-      showStoryViewer,
-      selectedStoryIndex,
-      storiesAvailable: stories?.length || 0,
-    });
-
-    if (showStoryViewer) {
-      console.log('✅ [BookmarksScreen] StoryViewer should be visible now!');
-    }
-  }, [showStoryViewer, selectedStoryIndex, stories]);
-
   // Debug: Component mount
   useEffect(() => {
-    console.log('🏗️ [BookmarksScreen] Component mounted');
-    console.log('👤 [BookmarksScreen] Current user:', {
-      id: user?.id,
-      email: user?.email,
-      name: user?.name,
-      hasUser: !!user,
-    });
-    return () => {
-      console.log('💀 [BookmarksScreen] Component unmounting');
-    };
+    return () => {};
   }, []);
 
-  // Debug: Log user changes
-  useEffect(() => {
-    console.log('👤 [BookmarksScreen] User changed:', {
-      userId: user?.id,
-      userEmail: user?.email,
-      userName: user?.name,
-    });
-  }, [user]);
-
-  // Debug: Log stories state
-  useEffect(() => {
-    console.log('📚 [BookmarksScreen] Stories state:', {
-      count: stories?.length || 0,
-      loading: storiesLoading,
-      stories: stories
-    });
-  }, [stories, storiesLoading]);
+  // (debug logs removed)
 
   useEffect(() => {
     loadBookmarks();
@@ -188,21 +155,8 @@ const BookmarksScreen = ({ navigation }) => {
 
   // Story handlers (removed useCallback to test)
   const handleStoryPress = async (storyIndex, userId) => {
-    console.log('📖 [BookmarksScreen] Story pressed:', {
-      storyIndex,
-      userId,
-      totalStories: stories?.length || 0,
-      selectedStory: stories?.[storyIndex] ? {
-        id: stories[storyIndex].id,
-        media_url: stories[storyIndex].media_url,
-        media_type: stories[storyIndex].media_type,
-      } : null,
-    });
-
     // Validate story index - if invalid, try to refresh and find the story
     if (storyIndex < 0 || storyIndex >= (stories?.length || 0) || !stories?.[storyIndex]) {
-      console.log('⚠️ [BookmarksScreen] Invalid story index, refreshing stories...');
-
       // Refresh stories first - use returned data (closure stories is stale after await)
       let freshStories = stories;
       if (fetchStories) {
@@ -212,20 +166,36 @@ const BookmarksScreen = ({ navigation }) => {
       // Try to find the story in the fresh data
       const newIndex = freshStories?.findIndex(s => Number(s.user_id) === Number(userId));
       if (newIndex >= 0 && freshStories?.[newIndex]) {
-        console.log('✅ [BookmarksScreen] Found story after refresh at index:', newIndex);
-        setSelectedStoryIndex(newIndex);
-        setShowStoryViewer(true);
+        const callbackId = registerNavigationCallback((viewedStoryIds) => {
+          if (viewedStoryIds && viewedStoryIds.length > 0) {
+            markStoriesAsViewed(viewedStoryIds);
+          }
+          setPendingStoryRefresh(true);
+        });
+
+        navigation.getParent()?.navigate('StoryViewerModal', {
+          stories: freshStories,
+          initialIndex: newIndex,
+          callbackId,
+        });
       } else {
-        console.log('❌ [BookmarksScreen] Story still not found after refresh');
         Alert.alert(t('storyNotFound'), t('storyNotFoundMsg'));
       }
       return;
     }
 
-    console.log('🔄 [BookmarksScreen] Setting story viewer state...');
-    setSelectedStoryIndex(storyIndex);
-    setShowStoryViewer(true);
-    console.log('🔄 [BookmarksScreen] Called setShowStoryViewer(true)');
+    const callbackId = registerNavigationCallback((viewedStoryIds) => {
+      if (viewedStoryIds && viewedStoryIds.length > 0) {
+        markStoriesAsViewed(viewedStoryIds);
+      }
+      setPendingStoryRefresh(true);
+    });
+
+    navigation.getParent()?.navigate('StoryViewerModal', {
+      stories,
+      initialIndex: storyIndex,
+      callbackId,
+    });
   };
 
   const handleAddStory = () => {
@@ -407,25 +377,6 @@ const BookmarksScreen = ({ navigation }) => {
             </View>
           ) : null
         }
-      />
-
-      {/* Story Viewer Modal */}
-      <StoryViewer
-        visible={showStoryViewer}
-        stories={stories}
-        initialIndex={selectedStoryIndex}
-        onClose={(viewedStoryIds) => {
-          setShowStoryViewer(false);
-          // Immediately mark stories as viewed in local state for instant UI update
-          if (viewedStoryIds && viewedStoryIds.length > 0) {
-            markStoriesAsViewed(viewedStoryIds);
-          }
-          fetchStories();
-        }}
-        onStoryChange={(index) => setSelectedStoryIndex(index)}
-        onNavigateToArchive={() => {
-          navigation.navigate('Profile', { screen: 'Archive' });
-        }}
       />
 
       {/* Video Preview Modal */}

@@ -21,15 +21,14 @@ import useStories from '../../hooks/useStories';
 import { apiService } from '../../services/ApiService';
 
 const StoryViewer = ({
-  visible,
+  visible = false,
   stories = [],
   initialIndex = 0,
   onClose,
   onStoryChange,
   onNavigateToArchive,
 }) => {
-  // FIRST LOG - Check if component is being called
-  console.log('🚀 [StoryViewer] Component function called', {
+  console.log('📖 [StoryViewer] Component function called', {
     visible,
     storiesCount: stories?.length,
     initialIndex,
@@ -69,19 +68,22 @@ const StoryViewer = ({
 
   // Immediately sync currentIndex when viewer opens (setState during render pattern)
   // This prevents stale index from previous session causing null currentStory
-  const [prevVisible, setPrevVisible] = useState(false);
-  const [prevInitialIndex, setPrevInitialIndex] = useState(initialIndex);
-  if (visible && (!prevVisible || initialIndex !== prevInitialIndex)) {
-    setCurrentIndex(safeInitialIndex);
-    setPrevVisible(true);
-    setPrevInitialIndex(initialIndex);
-    setIsPaused(false);
-    setPollVotes({});
-    setQuestionSent({});
-  }
-  if (!visible && prevVisible) {
-    setPrevVisible(false);
-  }
+  const prevVisibleRef = useRef(false);
+  const prevInitialIndexRef = useRef(initialIndex);
+  useEffect(() => {
+    const wasVisible = prevVisibleRef.current;
+    const prevIdx = prevInitialIndexRef.current;
+
+    if (visible && (!wasVisible || initialIndex !== prevIdx)) {
+      setCurrentIndex(safeInitialIndex);
+      setIsPaused(false);
+      setPollVotes({});
+      setQuestionSent({});
+    }
+
+    prevVisibleRef.current = visible;
+    prevInitialIndexRef.current = initialIndex;
+  }, [visible, initialIndex, safeInitialIndex]);
 
   const videoRef = useRef(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -104,18 +106,20 @@ const StoryViewer = ({
       visible,
       currentIndex,
       totalStories: stories?.length || 0,
-      currentStory: currentStory ? {
-        id: currentStory.id,
-        media_url: currentStory.media_url,
-        media_type: currentStory.media_type,
-        user_id: currentStory.user_id,
-        user_name: currentStory.user?.name,
-      } : null,
+      currentStory: currentStory
+        ? {
+            id: currentStory.id,
+            media_url: currentStory.media_url,
+            media_type: currentStory.media_type,
+            user_id: currentStory.user_id,
+            user_name: currentStory.user?.name,
+          }
+        : null,
       isOwner,
       isPaused,
       isLoading,
     });
-  }, [visible, currentIndex, currentStory, isOwner, isPaused, isLoading]);
+  }, [visible, currentIndex, currentStory, isOwner, isPaused, isLoading, stories?.length]);
 
   // Reset loading + progress whenever story changes (timer must not run while loading)
   useEffect(() => {
@@ -746,23 +750,9 @@ const StoryViewer = ({
     hasCurrentStory: !!currentStory,
   });
 
-  if (!visible) {
-    console.log('⚠️ [StoryViewer] Not rendering - visible is false');
-    return null;
-  }
-
-  if (!stories || stories.length === 0) {
-    console.log('⚠️ [StoryViewer] Not rendering - no stories');
-    return null;
-  }
-
-  if (!currentStory) {
-    console.log('⚠️ [StoryViewer] Not rendering - currentStory is null', {
-      currentIndex,
-      storiesLength: stories.length,
-    });
-    return null;
-  }
+  if (!visible) return null;
+  if (!stories || stories.length === 0) return null;
+  if (!currentStory) return null;
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],

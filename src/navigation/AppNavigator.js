@@ -14,6 +14,7 @@ import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
 import UploadScreen from '../screens/UploadScreen';
 import BookmarksScreen from '../screens/BookmarksScreen';
+import StoryViewerModalScreen from '../screens/StoryViewerModalScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import MyVideosScreen from '../screens/MyVideosScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -318,6 +319,11 @@ const RootStackNavigator = () => {
     <>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="MainTabs" component={MainTabs} />
+        <RootStack.Screen
+          name="StoryViewerModal"
+          component={StoryViewerModalScreen}
+          options={{ presentation: 'fullScreenModal' }}
+        />
         <RootStack.Screen
           name="Search"
           component={SearchScreen}
