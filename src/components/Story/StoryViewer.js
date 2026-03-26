@@ -117,11 +117,19 @@ const StoryViewer = ({
     });
   }, [visible, currentIndex, currentStory, isOwner, isPaused, isLoading]);
 
-  // Initialize progress animation
+  // Reset loading + progress whenever story changes (timer must not run while loading)
   useEffect(() => {
-    if (!visible || !currentStory || isPaused) return;
+    if (!visible || !currentStory) return;
+    setIsLoading(true);
+    progressAnim.stopAnimation();
+    progressAnim.setValue(0);
+  }, [currentIndex, visible, currentStory]);
 
-    const duration = (currentStory.duration || 5) * 1000; // Convert to milliseconds, default 5s
+  // Initialize progress animation (only after media has loaded)
+  useEffect(() => {
+    if (!visible || !currentStory || isPaused || isLoading) return;
+
+    const duration = (currentStory.duration || 5) * 1000; // ms, default 5s
 
     progressAnim.setValue(0);
 
@@ -138,7 +146,21 @@ const StoryViewer = ({
     return () => {
       progressAnim.stopAnimation();
     };
-  }, [currentIndex, visible, isPaused, currentStory]);
+  }, [currentIndex, visible, isPaused, isLoading, currentStory]);
+
+  // Failsafe: if media never loads, stop blocking UX forever
+  useEffect(() => {
+    if (!visible || !currentStory) return;
+    if (!isLoading) return;
+
+    const timeoutMs = 8000;
+    const t = setTimeout(() => {
+      // If still loading after timeout, hide loader and allow timer to proceed.
+      setIsLoading(false);
+    }, timeoutMs);
+
+    return () => clearTimeout(t);
+  }, [visible, currentStory, isLoading]);
 
   // Close handler that passes viewed story IDs back to parent
   const handleClose = () => {
@@ -790,6 +812,11 @@ const StoryViewer = ({
                     resizeMode="contain"
                     onLoadStart={() => isVisibleIdx && setIsLoading(true)}
                     onLoadEnd={() => isVisibleIdx && setIsLoading(false)}
+                    onError={() => {
+                      if (!isVisibleIdx) return;
+                      setIsLoading(false);
+                      handleNext();
+                    }}
                   />
                 ) : (
                   <Video
@@ -799,7 +826,13 @@ const StoryViewer = ({
                     resizeMode="contain"
                     shouldPlay={isVisibleIdx && !isPaused}
                     isLooping={false}
+                    onLoadStart={() => isVisibleIdx && setIsLoading(true)}
                     onLoad={() => isVisibleIdx && setIsLoading(false)}
+                    onError={() => {
+                      if (!isVisibleIdx) return;
+                      setIsLoading(false);
+                      handleNext();
+                    }}
                     onPlaybackStatusUpdate={(status) => {
                       if (isVisibleIdx && status.didJustFinish) {
                         handleNext();
